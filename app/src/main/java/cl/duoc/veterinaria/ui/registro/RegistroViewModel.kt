@@ -2,11 +2,11 @@ package cl.duoc.veterinaria.ui.registro
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cl.duoc.veterinaria.data.IVeterinariaRepository
 import cl.duoc.veterinaria.data.VeterinariaRepository
 import cl.duoc.veterinaria.model.Cliente
 import cl.duoc.veterinaria.model.Consulta
 import cl.duoc.veterinaria.model.DetallePedido
-import cl.duoc.veterinaria.model.Dueno
 import cl.duoc.veterinaria.model.EstadoConsulta
 import cl.duoc.veterinaria.model.Mascota
 import cl.duoc.veterinaria.model.Medicamento
@@ -27,28 +27,20 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
 
-/**
- * RegistroViewModel gestiona el estado del flujo de registro de consultas y pedidos.
- * Utiliza StateFlow para exponer un estado inmutable a la UI.
- */
-class RegistroViewModel : ViewModel() {
+class RegistroViewModel(
+    private val repository: IVeterinariaRepository = VeterinariaRepository
+) : ViewModel() {
 
-    // Estado interno mutable
     private val _uiState = MutableStateFlow(RegistroUiState())
-    // Estado público inmutable
     val uiState: StateFlow<RegistroUiState> = _uiState.asStateFlow()
 
-    // Catálogo de medicamentos disponibles (Hardcoded para este ejemplo)
     val catalogoMedicamentos = listOf(
         Medicamento("Antibiótico Generico", 500, 15000.0),
         Medicamento("Analgésico Básico", 200, 8000.0),
-        MedicamentoPromocional("Antiinflamatorio Premium", 200, 25000.0, 0.20), // 20% dcto
-        MedicamentoPromocional("Vitaminas Caninas", 100, 12000.0, 0.10) // 10% dcto
+        MedicamentoPromocional("Antiinflamatorio Premium", 200, 25000.0, 0.20),
+        MedicamentoPromocional("Vitaminas Caninas", 100, 12000.0, 0.10)
     )
 
-    // --- Actualizadores de Estado (Eventos) ---
-
-    // Agrupación de actualizaciones para Dueño
     fun updateDatosDueno(nombre: String? = null, telefono: String? = null, email: String? = null) {
         _uiState.update { currentState ->
             currentState.copy(
@@ -59,7 +51,6 @@ class RegistroViewModel : ViewModel() {
         }
     }
 
-    // Agrupación de actualizaciones para Mascota
     fun updateDatosMascota(
         nombre: String? = null,
         especie: String? = null,
@@ -69,19 +60,13 @@ class RegistroViewModel : ViewModel() {
     ) {
         _uiState.update { currentState ->
             var nuevoEdad = currentState.mascotaEdad
-            if (edad != null) {
-                if (edad.isEmpty() || edad.esNumeroValido()) {
-                    nuevoEdad = edad
-                }
+            if (edad != null && (edad.isEmpty() || edad.esNumeroValido())) {
+                nuevoEdad = edad
             }
-
             var nuevoPeso = currentState.mascotaPeso
-            if (peso != null) {
-                if (peso.isEmpty() || peso.esDecimalValido()) {
-                    nuevoPeso = peso
-                }
+            if (peso != null && (peso.isEmpty() || peso.esDecimalValido())) {
+                nuevoPeso = peso
             }
-
             currentState.copy(
                 mascotaNombre = nombre ?: currentState.mascotaNombre,
                 mascotaEspecie = especie ?: currentState.mascotaEspecie,
@@ -96,19 +81,15 @@ class RegistroViewModel : ViewModel() {
         _uiState.update { it.copy(tipoServicio = servicio) }
     }
 
-    // --- Lógica del Carrito de Medicamentos ---
-
     fun agregarMedicamentoAlCarrito(medicamento: Medicamento) {
         _uiState.update { currentState ->
             val carritoActual = currentState.carrito.toMutableList()
             val index = carritoActual.indexOfFirst { it.medicamento.nombre == medicamento.nombre }
 
             if (index != -1) {
-                // Si ya existe, aumentamos la cantidad
                 val detalleExistente = carritoActual[index]
                 carritoActual[index] = detalleExistente.copy(cantidad = detalleExistente.cantidad + 1)
             } else {
-                // Si no existe, lo agregamos
                 carritoActual.add(DetallePedido(medicamento, 1))
             }
             currentState.copy(carrito = carritoActual)
@@ -132,25 +113,16 @@ class RegistroViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Procesa el registro final: Consulta + Pedido de Medicamentos.
-     */
     fun procesarRegistro() {
         val currentState = _uiState.value
-        // Evitar reprocesar si ya hay una consulta registrada en este estado
         if (currentState.consultaRegistrada != null) return
 
         viewModelScope.launch {
-            // Inicia carga con mensaje "Cargando datos..."
-            _uiState.update { it.copy(isProcesando = true, mensajeProgreso = "Calculando costos...") }
-            delay(1500) // Simular primera etapa
-
-            // Cambia mensaje a "Generando resumen..."
-            _uiState.update { it.copy(mensajeProgreso = "Confirmando reserva y pedido...") }
-            delay(1500) // Simular segunda etapa
-
-            val dueno = Dueno(currentState.duenoNombre, currentState.duenoTelefono, currentState.duenoEmail)
+            _uiState.update { it.copy(isProcesando = true, mensajeProgreso = "Guardando...") }
             
+            // ELIMINAMOS DELAYS para asegurar guardado inmediato
+            // delay(1500) 
+
             val nombreCliente = if (currentState.duenoNombre.isNotBlank()) currentState.duenoNombre else "Cliente Anónimo"
             val emailCliente = if (currentState.duenoEmail.isNotBlank()) currentState.duenoEmail else "anonimo@mail.com"
             val telefonoCliente = if (currentState.duenoTelefono.isNotBlank()) currentState.duenoTelefono else "00000000"
@@ -168,7 +140,6 @@ class RegistroViewModel : ViewModel() {
             val servicio = currentState.tipoServicio ?: TipoServicio.CONTROL
             val minutosEstimados = 30
 
-            // 1. Lógica de Consulta Médica
             val fechaSugerida = AgendaVeterinario.siguienteSlotHabil(Clock.systemDefaultZone())
             val (veterinarioAsignado, slots) = AgendaVeterinario.reservarBloque(fechaSugerida, 1)
 
@@ -176,22 +147,16 @@ class RegistroViewModel : ViewModel() {
             val (costoConDescuento, _) = ConsultaService.aplicarDescuento(costoBase, 1)
             val costoFinal = ConsultaService.redondearClp(costoConDescuento)
 
-            // --- INTEGRACIÓN DE MASCOTA SERVICE ---
             var recomendacionVacuna: String? = null
             var comentariosExtra: String? = null
             
             if (servicio == TipoServicio.VACUNA) {
-                // Si el servicio es Vacuna, usamos MascotaService para lógica experta
                 val descripcionFreq = MascotaService.descripcionFrecuencia(mascota)
                 val proximaFecha = MascotaService.calcularProximaVacunacion(mascota)
-                
-                // Convertimos proximaFecha (LocalDate) a LocalDateTime para que AgendaVeterinario.fmt lo acepte
                 val fechaHoraVacuna = proximaFecha.atStartOfDay()
-                
                 recomendacionVacuna = "$descripcionFreq. Próxima dosis: ${AgendaVeterinario.fmt(fechaHoraVacuna)}"
                 comentariosExtra = "Se aplicó protocolo según $descripcionFreq."
             }
-            // ---------------------------------------
 
             val nuevaConsulta = Consulta(
                 idConsulta = "C-" + (100..999).random(),
@@ -200,27 +165,37 @@ class RegistroViewModel : ViewModel() {
                 estado = EstadoConsulta.PENDIENTE,
                 fechaAtencion = slots.firstOrNull(),
                 veterinarioAsignado = veterinarioAsignado,
-                comentarios = comentariosExtra // Guardamos la info también en la consulta
+                comentarios = comentariosExtra
             )
 
-            // 2. Lógica de Pedido de Medicamentos
             var nuevoPedido: Pedido? = null
             if (currentState.carrito.isNotEmpty()) {
                 nuevoPedido = Pedido(clientePedido, currentState.carrito)
             }
 
-            // Actualizar repositorio global
-            VeterinariaRepository.registrarAtencion(nombreCliente, 1, mascota.nombre, mascota.especie)
+            // Guardado síncrono inmediato
+            repository.registrarAtencion(nombreCliente, 1, mascota.nombre, mascota.especie, servicio.name)
 
-            // Actualizar estado final
             _uiState.update {
                 it.copy(
                     consultaRegistrada = nuevaConsulta,
                     pedidoRegistrado = nuevoPedido,
-                    recomendacionVacuna = recomendacionVacuna, // Pasamos la recomendación a la UI
+                    recomendacionVacuna = recomendacionVacuna,
                     isProcesando = false
                 )
             }
+        }
+    }
+
+    fun resetEstado() {
+        _uiState.update {
+            it.copy(
+                isProcesando = false,
+                mensajeProgreso = null,
+                consultaRegistrada = null,
+                pedidoRegistrado = null,
+                recomendacionVacuna = null
+            )
         }
     }
 

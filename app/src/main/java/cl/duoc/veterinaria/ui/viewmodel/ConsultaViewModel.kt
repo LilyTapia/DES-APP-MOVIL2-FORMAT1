@@ -19,4 +19,14 @@ class ConsultaViewModel(
     // Lista de mascotas registradas obtenida a través de la interfaz
     val listaPacientes: StateFlow<List<String>> = repository.listaMascotas
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Función para eliminar mascota, que se conecta al repositorio
+    fun eliminarConsulta(mascota: String) {
+        repository.eliminarMascota(mascota)
+    }
+
+    // Función para editar mascota (FALTANTE)
+    fun editarConsulta(original: String, nuevo: String) {
+        repository.editarMascota(original, nuevo)
+    }
 }

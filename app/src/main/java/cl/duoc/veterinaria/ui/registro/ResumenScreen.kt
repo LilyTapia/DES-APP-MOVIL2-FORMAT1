@@ -1,5 +1,6 @@
 package cl.duoc.veterinaria.ui.registro
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,11 +26,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cl.duoc.veterinaria.service.AgendaVeterinario
 import cl.duoc.veterinaria.util.ReflectionUtils
 import cl.duoc.veterinaria.ui.viewmodel.RegistroViewModel
+import cl.duoc.veterinaria.util.oVacio
 
 /**
  * ResumenScreen es el Composable para la pantalla que muestra el resumen de la consulta registrada.
@@ -41,6 +44,7 @@ import cl.duoc.veterinaria.ui.viewmodel.RegistroViewModel
 @Composable
 fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current // Contexto para lanzar Intents
 
     // LaunchedEffect se usa para ejecutar la lógica de procesamiento del registro una sola vez
     // cuando se compone esta pantalla.
@@ -77,7 +81,7 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(8.dp))
                 // Mensaje dinámico que cambia según el estado ("Cargando datos...", "Generando resumen...")
-                Text(uiState.mensajeProgreso)
+                Text(uiState.mensajeProgreso.oVacio("Procesando..."))
             }
         }
 
@@ -181,6 +185,45 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
                         Text("TOTAL A PAGAR", style = MaterialTheme.typography.titleLarge)
                         Text("$${(costoConsulta + costoPedido).toInt()}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
                     }
+                }
+
+                // --- INTENT IMPLÍCITO: Botón Compartir ---
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        val resumenTexto = """
+                            Resumen Veterinaria:
+                            Mascota: ${uiState.mascotaNombre}
+                            Consulta: ${consulta?.descripcion ?: "N/A"}
+                            Total: $${(if(esVentaDirecta) 0.0 else consulta?.costoConsulta ?: 0.0) + (pedido?.total ?: 0.0)}
+                        """.trimIndent()
+
+                        val sendIntent: Intent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, resumenTexto)
+                            type = "text/plain"
+                        }
+                        
+                        val shareIntent = Intent.createChooser(sendIntent, "Compartir resumen con...")
+                        
+                        // FORZAMOS LA NOTIFICACIÓN REINICIANDO EL SERVICIO
+                        // Pasamos EXPLICITAMENTE el tipo de servicio para asegurar que se notifique
+                        // lo correcto inmediatamente.
+                        val serviceIntent = Intent(context, cl.duoc.veterinaria.service.NotificacionService::class.java)
+                        
+                        // Obtenemos el tipo de servicio actual del ViewModel
+                        uiState.tipoServicio?.let { tipoEnum ->
+                            serviceIntent.putExtra("EXTRA_TIPO_ATENCION", tipoEnum.name)
+                        }
+                        
+                        context.startService(serviceIntent)
+                        
+                        context.startActivity(shareIntent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isProcesando
+                ) {
+                    Text("Compartir Resumen")
                 }
             }
         }

@@ -1,59 +1,48 @@
-# VeterinariaApp - Refactorización MVVM (Semana 7)
+# VeterinariaApp - Sumativa 3: Aplicando Android UI (Semana 8)
 
 ## Objetivo General
 
-Este proyecto es el resultado de la reestructuración de la aplicación "VeterinariaApp" para adoptar el patrón arquitectónico **Model-View-ViewModel (MVVM)**. El objetivo principal fue mejorar la modularidad, mantenibilidad y escalabilidad del código, aplicando las buenas prácticas de desarrollo de software **SOLID** y **KISS**.
+Este proyecto corresponde a la **Sumativa N°3 de la Semana 8**, titulada "Aplicando Android UI". El objetivo principal ha sido diseñar e implementar elementos de interfaz de usuario (UI) simples y funcionales, integrando utilidades gráficas nativas de Android, como **Services**, **Content Providers**, **Broadcast Receivers** e **Intents**, manteniendo la arquitectura **MVVM** desarrollada previamente y aplicando principios de **Material Design 3**.
 
 ---
 
-## 1. Patrón Arquitectónico MVVM
+## 1. Características Implementadas (Semana 8)
 
-La aplicación se ha organizado siguiendo una estricta separación de responsabilidades, donde cada componente tiene un rol bien definido:
+Se han integrado componentes fundamentales de Android para extender la funcionalidad de la aplicación:
 
-### a. Model (Modelo)
+### a. Componentes Nativos
+- **Activity**: Separación lógica en dos actividades:
+    - `MainActivity`: Contenedor principal de la aplicación.
+    - `ConsultasActivity`: Actividad secundaria dedicada exclusivamente a la gestión y listado de consultas.
+- **Service**: `NotificacionService` implementado como un *Foreground Service* para enviar recordatorios de salud y alertas en segundo plano.
+- **Content Provider**: `VeterinariaProvider` configurado para exponer datos básicos de mascotas (con permisos de lectura seguros).
+- **Broadcast Receiver**: `ConnectivityReceiver` que monitorea el estado de la red y notifica al usuario sobre la conexión a internet.
 
-Esta capa es responsable de toda la lógica de negocio y el acceso a los datos. Está compuesta por:
+### b. Navegación e Intents
+- **Intents Explícitos**: Navegación directa entre la pantalla principal y la pantalla de listado.
+- **Intents Implícitos**: Funcionalidad para **compartir el resumen de la consulta** como texto plano a través de otras aplicaciones (WhatsApp, Gmail, etc.).
+- **Intent Filters**: Configuración de Deep Link para abrir la aplicación desde una URL externa.
 
--   **Paquete `model`**: Contiene las clases de datos (`data class`) como `Mascota`, `Dueno`, `Consulta`, `Pedido`, etc. Son estructuras de datos simples que representan las entidades del negocio.
--   **Paquete `service`**: Agrupa objetos Singleton (`object`) que encapsulan reglas de negocio específicas, aplicando el Principio de Responsabilidad Única (SRP).
-    -   `AgendaVeterinario`: Lógica para agendar citas.
-    -   `ConsultaService`: Lógica para calcular costos.
-    -   `MascotaService`: Lógica relacionada con la salud de la mascota (ej. vacunación).
--   **Paquete `data`**: Contiene el Repositorio.
-    -   `IVeterinariaRepository`: Una **interfaz** que define el contrato para el acceso a datos, aplicando el Principio de Inversión de Dependencias (DIP).
-    -   `VeterinariaRepository`: La implementación Singleton que gestiona los datos en memoria y expone la información a través de `StateFlow`.
-
-### b. View (Vista)
-
-La capa de la Vista es la única con la que el usuario interactúa directamente. Está implementada 100% con **Jetpack Compose**.
-
--   **Paquete `ui/screens` y `ui/registro`**: Contienen los `Composables` que definen las pantallas de la aplicación (`BienvenidaScreen`, `DuenoScreen`, etc.).
--   **Responsabilidad**: Su única función es mostrar el estado que reciben del `ViewModel` y notificar las acciones del usuario (como clics en botones). No contienen ninguna lógica de negocio, siguiendo el principio KISS.
-
-### c. ViewModel (Vista-Modelo)
-
-Es el intermediario entre el Modelo y la Vista. Su función es preparar y gestionar los datos para la UI.
-
--   **Paquete `ui/viewmodel`**: Contiene las clases que heredan de `ViewModel`.
-    -   `MainViewModel`: Gestiona los datos de la pantalla de bienvenida.
-    -   `RegistroViewModel`: Mantiene el estado del formulario de registro de varios pasos.
-    -   `ConsultaViewModel`: Provee la lista de pacientes/consultas para la pantalla de listado.
--   **Comunicación**: Se comunica con la capa del Modelo (a través de la interfaz del repositorio) y expone los datos a la Vista mediante `StateFlow`, permitiendo que la UI se actualice de forma reactiva y eficiente.
+### c. Interfaz de Usuario (UI) Moderna
+- Implementación completa con **Jetpack Compose** y **Material Theme 3**.
+- Uso de componentes como `Scaffold`, `LazyColumn`, `Cards`, `OutlinedTextField` y `Navigation Drawer`.
+- Validaciones en tiempo real para mejorar la experiencia de usuario en los formularios.
 
 ---
 
-## 2. Principios SOLID y KISS
+## 2. Arquitectura MVVM (Consolidada desde Semana 7)
 
--   **Single Responsibility Principle (SRP)**: Cada clase tiene una única razón para cambiar. Los servicios (`ConsultaService`, `MascotaService`) son un claro ejemplo, al igual que la separación entre `ViewModel`, `Repository` y `Composable`.
--   **Open/Closed Principle (OCP)**: La clase `Medicamento` está abierta a extensión (con `MedicamentoPromocional`) pero cerrada a modificación.
--   **Dependency Inversion Principle (DIP)**: Los `ViewModels` dependen de la abstracción `IVeterinariaRepository`, no de la implementación concreta `VeterinariaRepository`.
--   **Keep It Simple, Stupid (KISS)**: Las Vistas son muy simples, sin lógica compleja. Las funciones en los servicios y ViewModels son directas y fáciles de entender.
+El proyecto mantiene y refuerza la estructura **Model-View-ViewModel** establecida anteriormente para asegurar modularidad y escalabilidad:
+
+-   **Model**: Entidades (`Mascota`, `Consulta`) y Servicios de Negocio.
+-   **View**: Pantallas (`Screens`) desarrolladas en Compose, libres de lógica de negocio.
+-   **ViewModel**: Gestión del estado de la UI y comunicación con el Repositorio.
 
 ---
 
 ## 3. Estructura del Proyecto
 
-El proyecto se ha consolidado en un único módulo `:app` para simplificar la estructura, como se solicitó en las instrucciones.
+El código fuente está organizado para reflejar esta arquitectura limpia:
 
 ```
 app/
@@ -63,42 +52,33 @@ app/
             └── cl/
                 └── duoc/
                     └── veterinaria/
-                        ├── MainActivity.kt
-                        ├── data/
-                        │   └── VeterinariaRepository.kt  (con su interfaz)
-                        ├── model/
-                        │   ├── Consulta.kt
-                        │   ├── Mascota.kt
-                        │   └── ... (otras entidades)
-                        ├── service/
-                        │   └── Services.kt
-                        └── ui/
+                        ├── MainActivity.kt        (Punto de entrada)
+                        ├── ConsultasActivity.kt   (Activity secundaria)
+                        ├── data/                  (Repositorio de datos)
+                        ├── service/               (NotificacionService y lógica de negocio)
+                        ├── provider/              (VeterinariaProvider)
+                        ├── receiver/              (ConnectivityReceiver)
+                        ├── model/                 (Clases de datos)
+                        └── ui/                    (Capa de Presentación)
                             ├── navigation/
-                            │   └── NavGraph.kt
-                            ├── registro/
-                            │   ├── DuenoScreen.kt
-                            │   └── ... (otras pantallas de registro)
-                            ├── screens/
-                            │   ├── BienvenidaScreen.kt
-                            │   └── ListadoScreen.kt
-                            ├── theme/
-                            │   └── Theme.kt
-                            └── viewmodel/
-                                ├── MainViewModel.kt
-                                ├── RegistroViewModel.kt
-                                └── ConsultaViewModel.kt
+                            ├── screens/           (Bienvenida, Listado, Pedidos)
+                            ├── registro/          (Flujo de registro)
+                            └── viewmodel/         (ViewModels)
 ```
 
 ---
 
-## 4. Cómo ejecutar
+## 4. Instrucciones de Ejecución
 
-1.  Clonar el repositorio.
-2.  Abrir el proyecto con Android Studio.
-3.  Permitir que Gradle sincronice las dependencias.
-4.  Ejecutar la aplicación en un emulador o dispositivo físico.
+1.  **Requisitos**: Android Studio Koala o superior.
+2.  **Sincronización**: Al abrir el proyecto, permitir la sincronización de Gradle.
+3.  **Ejecución**:
+    - Ejecutar en un emulador con API 26 o superior (Recomendado API 34).
+    - Para probar el **Broadcast Receiver**, alternar el modo avión o WiFi en el emulador.
+    - Para probar el **Service**, finalizar un registro y observar la notificación en la barra de estado.
 
 ---
 
 **Autor:**
 Liliana Tapia
+**Asignatura:** Desarrollo de Apps Móviles I - DUOC UC

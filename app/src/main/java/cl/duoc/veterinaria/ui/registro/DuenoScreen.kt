@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import cl.duoc.veterinaria.R
 import cl.duoc.veterinaria.ui.viewmodel.RegistroViewModel
+import cl.duoc.veterinaria.util.ValidationUtils
 
 /**
  * DuenoScreen es el Composable para la pantalla donde se ingresan los datos del dueño de la mascota.
@@ -35,13 +36,12 @@ fun DuenoScreen(viewModel: RegistroViewModel, onNextClicked: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
 
     // Validaciones:
-    // 1. Nombre no vacío.
-    // 2. Teléfono no vacío y solo dígitos.
-    // 3. Email no vacío y con formato válido (contiene @).
+    // Utilizando ValidationUtils para centralizar la lógica
+    val isNombreValido = ValidationUtils.isValidNombre(uiState.duenoNombre)
     val isTelefonoValido = uiState.duenoTelefono.isNotBlank() && uiState.duenoTelefono.all { it.isDigit() }
-    val isFormValid = uiState.duenoNombre.isNotBlank() && 
-                      isTelefonoValido && 
-                      uiState.duenoEmail.isNotBlank() && uiState.duenoEmail.contains("@")
+    val isEmailValido = ValidationUtils.isValidEmail(uiState.duenoEmail)
+    
+    val isFormValid = isNombreValido && isTelefonoValido && isEmailValido
 
     Column(
         modifier = Modifier
@@ -67,7 +67,7 @@ fun DuenoScreen(viewModel: RegistroViewModel, onNextClicked: () -> Unit) {
             value = uiState.duenoNombre,
             label = "Nombre del cliente",
             onValueChange = { viewModel.updateDatosDueno(nombre = it) },
-            isError = uiState.duenoNombre.isBlank()
+            isError = !isNombreValido && uiState.duenoNombre.isNotBlank() // Mostrar error si no es válido y no está vacío
         )
         Spacer(modifier = Modifier.height(8.dp))
         
@@ -83,7 +83,7 @@ fun DuenoScreen(viewModel: RegistroViewModel, onNextClicked: () -> Unit) {
                 }
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            isError = !isTelefonoValido
+            isError = !isTelefonoValido && uiState.duenoTelefono.isNotBlank()
         )
         Spacer(modifier = Modifier.height(8.dp))
         
@@ -92,7 +92,7 @@ fun DuenoScreen(viewModel: RegistroViewModel, onNextClicked: () -> Unit) {
             value = uiState.duenoEmail,
             label = "Email (para recordatorios)",
             onValueChange = { viewModel.updateDatosDueno(email = it) },
-            isError = uiState.duenoEmail.isBlank() || !uiState.duenoEmail.contains("@"),
+            isError = !isEmailValido && uiState.duenoEmail.isNotBlank(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
         Spacer(modifier = Modifier.height(24.dp))

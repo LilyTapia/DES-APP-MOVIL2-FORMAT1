@@ -1,5 +1,6 @@
 package cl.duoc.veterinaria.ui.screens
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,12 +52,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import cl.duoc.veterinaria.ConsultasActivity
 import cl.duoc.veterinaria.R
+import cl.duoc.veterinaria.service.NotificacionService
 import cl.duoc.veterinaria.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -67,8 +72,10 @@ fun BienvenidaScreen(
     onNavigateToRegistro: () -> Unit,
     onNavigateToListado: () -> Unit,
     onNavigateToPedidos: () -> Unit,
-    viewModel: MainViewModel = viewModel() // Inyección del ViewModel
+    viewModel: MainViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    
     // Observamos el estado DESDE EL VIEWMODEL (no desde el repositorio directo)
     val totalMascotas by viewModel.totalMascotas.collectAsState()
     val totalConsultas by viewModel.totalConsultas.collectAsState()
@@ -126,19 +133,21 @@ fun BienvenidaScreen(
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
 
-                // Opción 3: Listado de Mascotas
+                // Opción 3: Listado de Mascotas (Intent Explícito a Nueva Activity)
                 NavigationDrawerItem(
-                    label = { Text("Listado de Mascotas") },
+                    label = { Text("Listado (Nueva Activity)") },
                     selected = false,
                     onClick = { 
                         scope.launch { drawerState.close() }
-                        onNavigateToListado() 
+                        // Lanzamos la activity secundaria con Intent Explícito
+                        val intent = Intent(context, ConsultasActivity::class.java)
+                        context.startActivity(intent)
                     },
                     icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
-                
-                // Opción 4: Pedidos (Demo) - NUEVA OPCIÓN
+
+                // Opción 4: Pedidos
                 NavigationDrawerItem(
                     label = { Text("Pedidos (Demo)") },
                     selected = false,
@@ -147,6 +156,23 @@ fun BienvenidaScreen(
                         onNavigateToPedidos() 
                     },
                     icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                
+                // Opción 5: Recordar Última Alerta (Antes: Iniciar Servicio)
+                NavigationDrawerItem(
+                    label = { Text("Ver Última Alerta") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        // Lanzamos el servicio sin extra para que consulte SharedPreferences
+                        // y muestre la última notificación válida.
+                        val intent = Intent(context, NotificacionService::class.java)
+                        context.startService(intent)
+                    },
+                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
@@ -182,8 +208,9 @@ fun BienvenidaScreen(
                                     Icon(Icons.Default.Add, contentDescription = null)
                                 }
                             )
+                            // Navegación original por Compose (mantenida por compatibilidad)
                             DropdownMenuItem(
-                                text = { Text("Listado") },
+                                text = { Text("Listado (Compose)") },
                                 onClick = {
                                     showMenu = false
                                     onNavigateToListado()

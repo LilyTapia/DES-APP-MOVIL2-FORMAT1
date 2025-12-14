@@ -36,5 +36,5 @@ data class RegistroUiState(
     val isProcesando: Boolean = false,
     
     // Mensaje de carga para mostrar durante el progreso
-    val mensajeProgreso: String = "Procesando..."
+    val mensajeProgreso: String? = null
 )
