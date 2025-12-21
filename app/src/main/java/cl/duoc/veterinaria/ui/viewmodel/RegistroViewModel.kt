@@ -7,7 +7,6 @@ import cl.duoc.veterinaria.data.VeterinariaRepository
 import cl.duoc.veterinaria.model.Cliente
 import cl.duoc.veterinaria.model.Consulta
 import cl.duoc.veterinaria.model.DetallePedido
-import cl.duoc.veterinaria.model.Dueno
 import cl.duoc.veterinaria.model.EstadoConsulta
 import cl.duoc.veterinaria.model.Mascota
 import cl.duoc.veterinaria.model.Medicamento
@@ -29,11 +28,6 @@ import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
 
-/**
- * RegistroViewModel gestiona el estado del flujo de registro de consultas y pedidos.
- * Responsabilidad: Lógica de negocio del formulario de ingreso.
- * @param repository Inyección de dependencia del repositorio.
- */
 class RegistroViewModel(
     private val repository: IVeterinariaRepository = VeterinariaRepository
 ) : ViewModel() {
@@ -41,7 +35,9 @@ class RegistroViewModel(
     private val _uiState = MutableStateFlow(RegistroUiState())
     val uiState: StateFlow<RegistroUiState> = _uiState.asStateFlow()
 
-    // Catálogo de medicamentos
+    private val _serviceState = MutableStateFlow<ServiceState>(ServiceState.Idle)
+    val serviceState: StateFlow<ServiceState> = _serviceState.asStateFlow()
+
     val catalogoMedicamentos = listOf(
         Medicamento("Antibiótico Generico", 500, 15000.0),
         Medicamento("Analgésico Básico", 200, 8000.0),
@@ -50,13 +46,10 @@ class RegistroViewModel(
     )
 
     fun updateDatosDueno(nombre: String? = null, telefono: String? = null, email: String? = null) {
-        _uiState.update { currentState ->
-            currentState.copy(
-                duenoNombre = nombre ?: currentState.duenoNombre,
-                duenoTelefono = telefono ?: currentState.duenoTelefono,
-                duenoEmail = email ?: currentState.duenoEmail
-            )
-        }
+        _uiState.update { it.copy(
+            duenoNombre = nombre ?: it.duenoNombre,
+            duenoTelefono = telefono ?: it.duenoTelefono,
+            duenoEmail = email ?: it.duenoEmail) }
     }
 
     fun updateDatosMascota(
@@ -67,14 +60,8 @@ class RegistroViewModel(
         ultimaVacuna: String? = null
     ) {
         _uiState.update { currentState ->
-            var nuevoEdad = currentState.mascotaEdad
-            if (edad != null && (edad.isEmpty() || edad.esNumeroValido())) {
-                nuevoEdad = edad
-            }
-            var nuevoPeso = currentState.mascotaPeso
-            if (peso != null && (peso.isEmpty() || peso.esDecimalValido())) {
-                nuevoPeso = peso
-            }
+            val nuevoEdad = if (edad != null && (edad.isEmpty() || edad.esNumeroValido())) edad else currentState.mascotaEdad
+            val nuevoPeso = if (peso != null && (peso.isEmpty() || peso.esDecimalValido())) peso else currentState.mascotaPeso
             currentState.copy(
                 mascotaNombre = nombre ?: currentState.mascotaNombre,
                 mascotaEspecie = especie ?: currentState.mascotaEspecie,
@@ -93,7 +80,6 @@ class RegistroViewModel(
         _uiState.update { currentState ->
             val carritoActual = currentState.carrito.toMutableList()
             val index = carritoActual.indexOfFirst { it.medicamento.nombre == medicamento.nombre }
-
             if (index != -1) {
                 val detalleExistente = carritoActual[index]
                 carritoActual[index] = detalleExistente.copy(cantidad = detalleExistente.cantidad + 1)
@@ -108,7 +94,6 @@ class RegistroViewModel(
         _uiState.update { currentState ->
             val carritoActual = currentState.carrito.toMutableList()
             val index = carritoActual.indexOfFirst { it.medicamento.nombre == medicamento.nombre }
-
             if (index != -1) {
                 val detalleExistente = carritoActual[index]
                 if (detalleExistente.cantidad > 1) {
@@ -123,18 +108,18 @@ class RegistroViewModel(
 
     fun procesarRegistro() {
         val currentState = _uiState.value
-        if (currentState.consultaRegistrada != null) return
+        if (currentState.consultaRegistrada != null || _serviceState.value is ServiceState.Running) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isProcesando = true, mensajeProgreso = "Calculando costos...") }
+            _serviceState.value = ServiceState.Running("Calculando costos...")
             delay(1500)
-            _uiState.update { it.copy(mensajeProgreso = "Confirmando reserva y pedido...") }
+            _serviceState.value = ServiceState.Running("Confirmando reserva y pedido...")
             delay(1500)
 
             val nombreCliente = if (currentState.duenoNombre.isNotBlank()) currentState.duenoNombre else "Cliente Anónimo"
             val emailCliente = if (currentState.duenoEmail.isNotBlank()) currentState.duenoEmail else "anonimo@mail.com"
             val telefonoCliente = if (currentState.duenoTelefono.isNotBlank()) currentState.duenoTelefono else "00000000"
-            
+
             val clientePedido = Cliente(nombreCliente, emailCliente, telefonoCliente)
 
             val mascota = Mascota(
@@ -146,24 +131,18 @@ class RegistroViewModel(
             )
 
             val servicio = currentState.tipoServicio ?: TipoServicio.CONTROL
-            val minutosEstimados = 30
 
-            val fechaSugerida = AgendaVeterinario.siguienteSlotHabil(Clock.systemDefaultZone())
-            val (veterinarioAsignado, slots) = AgendaVeterinario.reservarBloque(fechaSugerida, 1)
+            val (veterinarioAsignado, slots) = AgendaVeterinario.reservarBloque(AgendaVeterinario.siguienteSlotHabil(Clock.systemDefaultZone()), 1)
 
-            val costoBase = ConsultaService.calcularCostoBase(servicio, minutosEstimados)
-            val (costoConDescuento, _) = ConsultaService.aplicarDescuento(costoBase, 1)
-            val costoFinal = ConsultaService.redondearClp(costoConDescuento)
+            val costoFinal = ConsultaService.redondearClp(ConsultaService.aplicarDescuento(ConsultaService.calcularCostoBase(servicio, 30), 1).first)
 
             var recomendacionVacuna: String? = null
             var comentariosExtra: String? = null
-            
+
             if (servicio == TipoServicio.VACUNA) {
-                val descripcionFreq = MascotaService.descripcionFrecuencia(mascota)
                 val proximaFecha = MascotaService.calcularProximaVacunacion(mascota)
-                val fechaHoraVacuna = proximaFecha.atStartOfDay()
-                recomendacionVacuna = "$descripcionFreq. Próxima dosis: ${AgendaVeterinario.fmt(fechaHoraVacuna)}"
-                comentariosExtra = "Se aplicó protocolo según $descripcionFreq."
+                recomendacionVacuna = "Próxima dosis: ${AgendaVeterinario.fmt(proximaFecha.atStartOfDay())}"
+                comentariosExtra = "Se aplicó protocolo según ${MascotaService.descripcionFrecuencia(mascota)}."
             }
 
             val nuevaConsulta = Consulta(
@@ -181,21 +160,28 @@ class RegistroViewModel(
                 nuevoPedido = Pedido(clientePedido, currentState.carrito)
             }
 
-            // Usamos el repositorio a través de la interfaz
-            repository.registrarAtencion(nombreCliente, 1, mascota.nombre, mascota.especie)
+            repository.registrarAtencion(nombreCliente, 1, mascota.nombre, mascota.especie, servicio.name)
 
             _uiState.update {
                 it.copy(
                     consultaRegistrada = nuevaConsulta,
                     pedidoRegistrado = nuevoPedido,
                     recomendacionVacuna = recomendacionVacuna,
-                    isProcesando = false
+                    notificacionAutomaticaMostrada = false // Inicialmente en false
                 )
             }
+            _serviceState.value = ServiceState.Stopped
+            // Activa la bandera para la notificación automática
+            _uiState.update { it.copy(notificacionAutomaticaMostrada = true) }
         }
+    }
+    
+    fun onNotificacionMostrada(){
+        _uiState.update { it.copy(notificacionAutomaticaMostrada = false) }
     }
 
     fun clearData() {
         _uiState.value = RegistroUiState()
+        _serviceState.value = ServiceState.Idle
     }
 }

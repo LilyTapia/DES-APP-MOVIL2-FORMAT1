@@ -1,81 +1,89 @@
-# VeterinariaApp - Sumativa 3: Aplicando Android UI (Semana 8)
+# VeterinariaApp - Evaluación Final Transversal (Semana 9)
 
 ## Objetivo General
 
-Este proyecto corresponde a la **Sumativa N°3 de la Semana 8**, titulada "Aplicando Android UI". El objetivo principal ha sido diseñar e implementar elementos de interfaz de usuario (UI) simples y funcionales, integrando utilidades gráficas nativas de Android, como **Services**, **Content Providers**, **Broadcast Receivers** e **Intents**, manteniendo la arquitectura **MVVM** desarrollada previamente y aplicando principios de **Material Design 3**.
+Este proyecto corresponde a la **Evaluación Final Transversal (Semana 9)**. El objetivo principal ha sido consolidar una aplicación Android funcional y robusta, integrando componentes
+ nativos como **Services**, **Broadcast Receivers** e **Intents**, manteniendo la arquitectura **MVVM** y aplicando principios de **Material Design 3**. Además, se han incorporado **pruebas unitarias** para garantizar la calidad y el correcto funcionamiento de la lógica de negocio.
 
 ---
 
-## 1. Características Implementadas (Semana 8)
-
-Se han integrado componentes fundamentales de Android para extender la funcionalidad de la aplicación:
+## 1. Características Implementadas (Consolidado)
 
 ### a. Componentes Nativos
-- **Activity**: Separación lógica en dos actividades:
-    - `MainActivity`: Contenedor principal de la aplicación.
-    - `ConsultasActivity`: Actividad secundaria dedicada exclusivamente a la gestión y listado de consultas.
-- **Service**: `NotificacionService` implementado como un *Foreground Service* para enviar recordatorios de salud y alertas en segundo plano.
-- **Content Provider**: `VeterinariaProvider` configurado para exponer datos básicos de mascotas (con permisos de lectura seguros).
-- **Broadcast Receiver**: `ConnectivityReceiver` que monitorea el estado de la red y notifica al usuario sobre la conexión a internet.
+- **Activity**: Separación lógica en `MainActivity` y `ConsultasActivity`.
+- **Service**: `NotificacionService` implementado como *Foreground Service* para recordatorios.
+- **Content Provider**: `VeterinariaProvider` para exponer datos de mascotas de forma segura.
+- **Broadcast Receiver**: `ConnectivityReceiver` para monitorear el estado de la red.
 
 ### b. Navegación e Intents
-- **Intents Explícitos**: Navegación directa entre la pantalla principal y la pantalla de listado.
-- **Intents Implícitos**: Funcionalidad para **compartir el resumen de la consulta** como texto plano a través de otras aplicaciones (WhatsApp, Gmail, etc.).
-- **Intent Filters**: Configuración de Deep Link para abrir la aplicación desde una URL externa.
+- **Intents Explícitos**: Para la navegación entre actividades.
+- **Intents Implícitos**: Para compartir resúmenes de consultas.
+- **Intent Filters**: Configuración de Deep Link.
 
 ### c. Interfaz de Usuario (UI) Moderna
-- Implementación completa con **Jetpack Compose** y **Material Theme 3**.
-- Uso de componentes como `Scaffold`, `LazyColumn`, `Cards`, `OutlinedTextField` y `Navigation Drawer`.
-- Validaciones en tiempo real para mejorar la experiencia de usuario en los formularios.
+- Implementación 100% con **Jetpack Compose** y **Material Theme 3**.
+- Uso de `Scaffold`, `LazyColumn`, `Cards`, y `Navigation Drawer`.
+- Validaciones de formularios en tiempo real.
 
 ---
 
-## 2. Arquitectura MVVM (Consolidada desde Semana 7)
+## 2. Pruebas Unitarias (Semana 9)
 
-El proyecto mantiene y refuerza la estructura **Model-View-ViewModel** establecida anteriormente para asegurar modularidad y escalabilidad:
+Se han añadido pruebas unitarias utilizando **JUnit** y **Mockito** para validar la lógica de negocio en los ViewModels, asegurando que los casos de uso principales funcionen como se espera.
 
--   **Model**: Entidades (`Mascota`, `Consulta`) y Servicios de Negocio.
--   **View**: Pantallas (`Screens`) desarrolladas en Compose, libres de lógica de negocio.
--   **ViewModel**: Gestión del estado de la UI y comunicación con el Repositorio.
+-   **`RegistroViewModelTest`**:
+    -   Verifica que el registro de un dueño sea exitoso cuando los datos son válidos.
+    -   Comprueba que el estado de la UI se actualice correctamente a `Success` tras un registro válido.
+-   **Objetivo**: Garantizar la fiabilidad del flujo de registro y la correcta gestión del estado.
 
 ---
 
-## 3. Estructura del Proyecto
+## 3. Arquitectura MVVM
 
-El código fuente está organizado para reflejar esta arquitectura limpia:
+El proyecto mantiene la estructura **Model-View-ViewModel** para asegurar modularidad y escalabilidad:
+
+-   **Model**: Entidades (`Mascota`, `Consulta`) y Lógica de Negocio.
+-   **View**: Pantallas en Compose, sin lógica de negocio.
+-   **ViewModel**: Gestión del estado de la UI y comunicación con la capa de datos.
+
+---
+
+## 4. Estructura del Proyecto
 
 ```
 app/
 └── src/
-    └── main/
-        └── java/
-            └── cl/
-                └── duoc/
-                    └── veterinaria/
-                        ├── MainActivity.kt        (Punto de entrada)
-                        ├── ConsultasActivity.kt   (Activity secundaria)
-                        ├── data/                  (Repositorio de datos)
-                        ├── service/               (NotificacionService y lógica de negocio)
-                        ├── provider/              (VeterinariaProvider)
-                        ├── receiver/              (ConnectivityReceiver)
-                        ├── model/                 (Clases de datos)
-                        └── ui/                    (Capa de Presentación)
-                            ├── navigation/
-                            ├── screens/           (Bienvenida, Listado, Pedidos)
-                            ├── registro/          (Flujo de registro)
-                            └── viewmodel/         (ViewModels)
+    ├── main/
+    │   └── java/cl/duoc/veterinaria/
+    │       ├── MainActivity.kt
+    │       ├── ConsultasActivity.kt
+    │       ├── data/
+    │       ├── model/
+    │       ├── provider/
+    │       ├── receiver/
+    │       ├── service/
+    │       └── ui/
+    │           ├── navigation/
+    │           ├── registro/
+    │           └── viewmodel/
+    └── test/
+        └── java/cl/duoc/veterinaria/
+            └── ui/viewmodel/
+                └── RegistroViewModelTest.kt  (Pruebas Unitarias)
 ```
 
 ---
 
-## 4. Instrucciones de Ejecución
+## 5. Instrucciones de Ejecución
 
 1.  **Requisitos**: Android Studio Koala o superior.
-2.  **Sincronización**: Al abrir el proyecto, permitir la sincronización de Gradle.
+2.  **Sincronización**: Permitir la sincronización de Gradle al abrir.
 3.  **Ejecución**:
-    - Ejecutar en un emulador con API 26 o superior (Recomendado API 34).
-    - Para probar el **Broadcast Receiver**, alternar el modo avión o WiFi en el emulador.
-    - Para probar el **Service**, finalizar un registro y observar la notificación en la barra de estado.
+    - Ejecutar en un emulador (Recomendado API 34).
+    - Para probar el **Broadcast Receiver**, alternar el modo avión o WiFi.
+    - Para probar el **Service**, finalizar un registro para ver la notificación.
+4.  **Ejecutar Pruebas**:
+    - Clic derecho en `RegistroViewModelTest.kt` y seleccionar "Run '''RegistroViewModelTest'''".
 
 ---
 

@@ -33,8 +33,7 @@ data class RegistroUiState(
     // Resultado
     val consultaRegistrada: Consulta? = null,
     val pedidoRegistrado: Pedido? = null, // Almacenamos el pedido final confirmado
-    val isProcesando: Boolean = false,
-    
-    // Mensaje de carga para mostrar durante el progreso
-    val mensajeProgreso: String? = null
+
+    // Control de notificaciones
+    val notificacionAutomaticaMostrada: Boolean = false
 )

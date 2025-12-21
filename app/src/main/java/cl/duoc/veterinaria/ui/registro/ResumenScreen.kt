@@ -30,69 +30,60 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cl.duoc.veterinaria.service.AgendaVeterinario
-import cl.duoc.veterinaria.util.ReflectionUtils
+import cl.duoc.veterinaria.service.NotificacionService
 import cl.duoc.veterinaria.ui.viewmodel.RegistroViewModel
-import cl.duoc.veterinaria.util.oVacio
+import cl.duoc.veterinaria.ui.viewmodel.ServiceState
+import cl.duoc.veterinaria.util.ReflectionUtils
 
-/**
- * ResumenScreen es el Composable para la pantalla que muestra el resumen de la consulta registrada.
- * Utiliza utilidades de reflexión y sobrecarga de operadores (si aplica) para mostrar información avanzada.
- *
- * @param viewModel El ViewModel que contiene el estado del formulario de registro y el resultado de la consulta.
- * @param onConfirmClicked La acción a ejecutar cuando se hace clic en el botón de confirmación.
- */
 @Composable
 fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current // Contexto para lanzar Intents
+    val serviceState by viewModel.serviceState.collectAsState()
+    val context = LocalContext.current
 
-    // LaunchedEffect se usa para ejecutar la lógica de procesamiento del registro una sola vez
-    // cuando se compone esta pantalla.
     LaunchedEffect(Unit) {
         viewModel.procesarRegistro()
     }
 
-    // Obtiene la consulta registrada desde el ViewModel.
+    // --- Notificación Automática ---
+    LaunchedEffect(uiState.notificacionAutomaticaMostrada) {
+        if (uiState.notificacionAutomaticaMostrada) {
+            val serviceIntent = Intent(context, NotificacionService::class.java).apply {
+                putExtra("EXTRA_TITULO", "¡Consulta Registrada!")
+                putExtra("EXTRA_TEXTO", "La consulta para '${uiState.mascotaNombre}' se ha guardado exitosamente.")
+            }
+            context.startService(serviceIntent)
+            viewModel.onNotificacionMostrada() // Resetea la bandera
+        }
+    }
+
     val consulta = uiState.consultaRegistrada
     val pedido = uiState.pedidoRegistrado
-
-    // Determinamos si es una consulta completa o una venta directa
     val esVentaDirecta = uiState.duenoNombre.isBlank()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()), // Habilitamos scroll por si el contenido es largo
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(if (esVentaDirecta) "Resumen Venta Farmacia" else "Resumen Final", 
-             style = MaterialTheme.typography.headlineMedium)
+        Text(if (esVentaDirecta) "Resumen Venta Farmacia" else "Resumen Final", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Animación de visibilidad para el indicador de progreso
-        AnimatedVisibility(
-            visible = uiState.isProcesando,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
+        AnimatedVisibility(visible = serviceState is ServiceState.Running, enter = fadeIn(), exit = fadeOut()) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(8.dp))
-                // Mensaje dinámico que cambia según el estado ("Cargando datos...", "Generando resumen...")
-                Text(uiState.mensajeProgreso.oVacio("Procesando..."))
+                if (serviceState is ServiceState.Running) {
+                    Text((serviceState as ServiceState.Running).message)
+                }
             }
         }
 
-        // Muestra los detalles de la consulta si ya ha sido registrada.
-        AnimatedVisibility(
-            visible = !uiState.isProcesando,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
+        AnimatedVisibility(visible = serviceState is ServiceState.Stopped, enter = fadeIn(), exit = fadeOut()) {
             Column {
-                // Solo mostramos la tarjeta de consulta si NO es venta directa (es decir, si hubo registro)
                 if (consulta != null && !esVentaDirecta) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -106,38 +97,24 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
                             Text("Descripción: ${consulta.descripcion}")
                             Text("Fecha: ${consulta.fechaAtencion?.let { AgendaVeterinario.fmt(it) } ?: "No asignada"}")
                             Text("Veterinario: ${consulta.veterinarioAsignado?.nombre ?: "No asignado"}")
-                            
-                            // Mostrar recomendación de MascotaService si existe
-                            if (uiState.recomendacionVacuna != null) {
+
+                            uiState.recomendacionVacuna?.let {
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Plan de Vacunación: ${uiState.recomendacionVacuna}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Text("Plan de Vacunación: $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("Costo Consulta: $${consulta.costoConsulta}", fontWeight = FontWeight.Bold)
-                            
+
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Info Técnica:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                            Text(
-                                text = ReflectionUtils.describir(consulta),
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Text("Info Técnica:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                            Text(ReflectionUtils.describir(consulta), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Mostrar detalle del pedido si existe
+
                 if (pedido != null) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -147,8 +124,7 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("Detalle Pedido Farmacia", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                            
-                            // Mostrar nombre del cliente solo si es venta directa para contexto
+
                             if (esVentaDirecta) {
                                 Text("Cliente: Venta de Mostrador (Anónimo)")
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -157,7 +133,7 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
                             pedido.detalles.forEach { detalle ->
                                 Text("- ${detalle.cantidad}x ${detalle.medicamento.nombre}: $${detalle.subtotal}")
                             }
-                            
+
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             Text("Total Pedido: $${pedido.total}", fontWeight = FontWeight.Bold)
                             if (pedido.total < pedido.totalSinPromocion()) {
@@ -166,62 +142,46 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Total Global
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Si es venta directa, el costo de consulta es 0 visualmente (aunque el objeto exista internamente)
+
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         val costoConsulta = if (esVentaDirecta) 0.0 else (consulta?.costoConsulta ?: 0.0)
                         val costoPedido = pedido?.total ?: 0.0
-                        
                         Text("TOTAL A PAGAR", style = MaterialTheme.typography.titleLarge)
                         Text("$${(costoConsulta + costoPedido).toInt()}", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // --- INTENT IMPLÍCITO: Botón Compartir ---
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
+                        // --- Notificación Manual ---
+                        val serviceIntent = Intent(context, NotificacionService::class.java).apply {
+                            putExtra("EXTRA_TITULO", "Resumen Compartido")
+                            putExtra("EXTRA_TEXTO", "Se ha compartido el resumen de la consulta.")
+                        }
+                        context.startService(serviceIntent)
+
+                        // --- Lógica para compartir ---
                         val resumenTexto = """
                             Resumen Veterinaria:
                             Mascota: ${uiState.mascotaNombre}
                             Consulta: ${consulta?.descripcion ?: "N/A"}
-                            Total: $${(if(esVentaDirecta) 0.0 else consulta?.costoConsulta ?: 0.0) + (pedido?.total ?: 0.0)}
+                            Total: $${(if (esVentaDirecta) 0.0 else consulta?.costoConsulta ?: 0.0) + (pedido?.total ?: 0.0)}
                         """.trimIndent()
 
-                        val sendIntent: Intent = Intent().apply {
+                        val sendIntent = Intent().apply {
                             action = Intent.ACTION_SEND
                             putExtra(Intent.EXTRA_TEXT, resumenTexto)
                             type = "text/plain"
                         }
-                        
                         val shareIntent = Intent.createChooser(sendIntent, "Compartir resumen con...")
-                        
-                        // FORZAMOS LA NOTIFICACIÓN REINICIANDO EL SERVICIO
-                        // Pasamos EXPLICITAMENTE el tipo de servicio para asegurar que se notifique
-                        // lo correcto inmediatamente.
-                        val serviceIntent = Intent(context, cl.duoc.veterinaria.service.NotificacionService::class.java)
-                        
-                        // Obtenemos el tipo de servicio actual del ViewModel
-                        uiState.tipoServicio?.let { tipoEnum ->
-                            serviceIntent.putExtra("EXTRA_TIPO_ATENCION", tipoEnum.name)
-                        }
-                        
-                        context.startService(serviceIntent)
-                        
                         context.startActivity(shareIntent)
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isProcesando
+                    enabled = serviceState is ServiceState.Stopped
                 ) {
                     Text("Compartir Resumen")
                 }
@@ -229,13 +189,7 @@ fun ResumenScreen(viewModel: RegistroViewModel, onConfirmClicked: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        // Botón para confirmar y volver a la pantalla de inicio.
-        Button(
-            onClick = onConfirmClicked,
-            modifier = Modifier.fillMaxWidth(),
-            // El botón se habilita solo cuando el proceso ha terminado.
-            enabled = !uiState.isProcesando
-        ) {
+        Button(onClick = onConfirmClicked, modifier = Modifier.fillMaxWidth(), enabled = serviceState is ServiceState.Stopped) {
             Text("Finalizar y Volver al Inicio")
         }
     }
