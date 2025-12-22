@@ -36,6 +36,13 @@ class RegistroViewModelTest {
         }
 
         override fun init(context: Context) {}
+        override fun eliminarMascota(nombreMascota: String) {
+            
+        }
+
+        override fun editarMascota(textoOriginal: String, textoNuevo: String) {
+            
+        }
     }
 
     @Before
